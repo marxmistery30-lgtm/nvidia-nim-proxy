@@ -40,7 +40,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       stream 
     } = req.body;
 
-    const finalModel = model || 'deepseek-ai/deepseek-v3';
+    const finalModel = model || 'deepseek-ai/deepseek-v3.1';
     const finalTemp = temperature || 0.7;
     const finalMaxTokens = max_tokens || 2048;
     const finalStream = stream || false;
@@ -173,7 +173,7 @@ app.get('/v1/models', (req, res) => {
     object: 'list',
     data: [
       { 
-        id: 'deepseek-ai/deepseek-v3', 
+        id: 'deepseek-ai/deepseek-v3.1', 
         object: 'model', 
         created: 1234567890,
         owned_by: 'deepseek-ai' 
