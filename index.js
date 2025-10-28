@@ -20,10 +20,10 @@ app.use(express.json());
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 
-// Manejar múltiples rutas posibles
 app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, res) => {
   try {
     if (!NVIDIA_API_KEY) {
+      console.error('ERROR: NVIDIA_API_KEY no configurada');
       return res.status(500).json({
         error: {
           message: 'NVIDIA_API_KEY no configurada en variables de entorno',
@@ -43,6 +43,9 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
+    console.log('Enviando petición a NVIDIA con modelo:', model);
+    console.log('Número de mensajes:', messages.length);
+
     const response = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
       {
@@ -57,13 +60,28 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           'Authorization': `Bearer ${NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 120000 // 2 minutos de timeout
+        timeout: 120000
       }
     );
 
-    res.json(response.data);
+    console.log('Respuesta recibida de NVIDIA:', JSON.stringify(response.data).substring(0, 200));
+    
+    // Asegurar que la respuesta tenga el formato correcto para OpenAI
+    const formattedResponse = {
+      id: response.data.id || 'chatcmpl-' + Date.now(),
+      object: 'chat.completion',
+      created: response.data.created || Math.floor(Date.now() / 1000),
+      model: response.data.model || model,
+      choices: response.data.choices || [],
+      usage: response.data.usage || {}
+    };
+
+    console.log('Enviando respuesta formateada a JanitorAI');
+    res.json(formattedResponse);
+    
   } catch (error) {
-    console.error('Error completo:', error.response?.data || error.message);
+    console.error('Error completo:', error.message);
+    console.error('Error response:', error.response?.data);
     res.status(error.response?.status || 500).json({
       error: {
         message: error.response?.data?.error?.message || error.message,
