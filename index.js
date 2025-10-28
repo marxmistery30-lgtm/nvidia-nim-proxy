@@ -32,7 +32,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
-    const { messages, model = 'deepseek-ai/deepseek-r1', temperature = 0.6, max_tokens = 2048 } = req.body;
+    const { messages, model = 'deepseek-ai/deepseek-r1', temperature = 0.6, max_tokens = 2048, stream = false } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({
@@ -64,24 +64,41 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       }
     );
 
-    console.log('Respuesta recibida de NVIDIA:', JSON.stringify(response.data).substring(0, 200));
+    console.log('Respuesta recibida de NVIDIA');
+    console.log('Choices:', response.data.choices?.length);
+    console.log('Primer mensaje:', response.data.choices?.[0]?.message?.content?.substring(0, 100));
     
-    // Asegurar que la respuesta tenga el formato correcto para OpenAI
+    // Formato compatible con JanitorAI/OpenAI
     const formattedResponse = {
-      id: response.data.id || 'chatcmpl-' + Date.now(),
+      id: response.data.id || `chatcmpl-${Date.now()}`,
       object: 'chat.completion',
       created: response.data.created || Math.floor(Date.now() / 1000),
-      model: response.data.model || model,
-      choices: response.data.choices || [],
-      usage: response.data.usage || {}
+      model: model,
+      choices: (response.data.choices || []).map((choice, index) => ({
+        index: choice.index !== undefined ? choice.index : index,
+        message: {
+          role: choice.message?.role || 'assistant',
+          content: choice.message?.content || ''
+        },
+        finish_reason: choice.finish_reason || 'stop'
+      })),
+      usage: response.data.usage || {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
+      }
     };
 
-    console.log('Enviando respuesta formateada a JanitorAI');
+    console.log('Respuesta formateada - Content length:', formattedResponse.choices[0]?.message?.content?.length);
+    
     res.json(formattedResponse);
     
   } catch (error) {
     console.error('Error completo:', error.message);
-    console.error('Error response:', error.response?.data);
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Data:', JSON.stringify(error.response.data));
+    }
     res.status(error.response?.status || 500).json({
       error: {
         message: error.response?.data?.error?.message || error.message,
@@ -94,8 +111,14 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 
 app.get('/v1/models', async (req, res) => {
   res.json({
+    object: 'list',
     data: [
-      { id: 'deepseek-ai/deepseek-r1', object: 'model', owned_by: 'deepseek-ai' }
+      { 
+        id: 'deepseek-ai/deepseek-r1', 
+        object: 'model', 
+        created: 1234567890,
+        owned_by: 'deepseek-ai' 
+      }
     ]
   });
 });
