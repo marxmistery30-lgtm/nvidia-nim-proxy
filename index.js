@@ -32,7 +32,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
-    const { messages, model = 'nvidia/deepseek-r1', temperature = 0.7, max_tokens = 2048 } = req.body;
+    const { messages, model = 'deepseek-ai/deepseek-r1', temperature = 0.6, max_tokens = 2048 } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({
@@ -76,7 +76,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 app.get('/v1/models', async (req, res) => {
   res.json({
     data: [
-      { id: 'nvidia/deepseek-r1', object: 'model', owned_by: 'nvidia' }
+      { id: 'deepseek-ai/deepseek-r1', object: 'model', owned_by: 'deepseek-ai' }
     ]
   });
 });
