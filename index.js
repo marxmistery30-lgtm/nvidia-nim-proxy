@@ -26,13 +26,19 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       console.error('ERROR: NVIDIA_API_KEY no configurada');
       return res.status(500).json({
         error: {
-          message: 'NVIDIA_API_KEY no configurada en variables de entorno',
+          message: 'NVIDIA_API_KEY no configurada',
           type: 'configuration_error'
         }
       });
     }
 
-    const { messages, model = 'deepseek-ai/deepseek-r1', temperature = 0.6, max_tokens = 2048, stream = false } = req.body;
+    const { 
+      messages, 
+      model = 'deepseek-ai/deepseek-r1', 
+      temperature = 0.7, 
+      max_tokens = 2048,
+      stream = false 
+    } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({
@@ -43,10 +49,9 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
-    console.log('Enviando petición a NVIDIA con modelo:', model);
-    console.log('Número de mensajes:', messages.length);
+    console.log('REQUEST - Model:', model, 'Messages:', messages.length, 'Stream:', stream);
 
-    const response = await axios.post(
+    const nvidiaResponse = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
       {
         model: model,
@@ -64,46 +69,45 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       }
     );
 
-    console.log('Respuesta recibida de NVIDIA');
-    console.log('Choices:', response.data.choices?.length);
-    console.log('Primer mensaje:', response.data.choices?.[0]?.message?.content?.substring(0, 100));
-    
-    // Formato compatible con JanitorAI/OpenAI
-    const formattedResponse = {
-      id: response.data.id || `chatcmpl-${Date.now()}`,
+    const content = nvidiaResponse.data.choices?.[0]?.message?.content || '';
+    console.log('NVIDIA RESPONSE - Length:', content.length, 'First 50 chars:', content.substring(0, 50));
+
+    // Formato OpenAI estricto
+    const openaiResponse = {
+      id: nvidiaResponse.data.id || `chatcmpl-${Date.now()}`,
       object: 'chat.completion',
-      created: response.data.created || Math.floor(Date.now() / 1000),
+      created: Math.floor(Date.now() / 1000),
       model: model,
-      choices: (response.data.choices || []).map((choice, index) => ({
-        index: choice.index !== undefined ? choice.index : index,
+      choices: [{
+        index: 0,
         message: {
-          role: choice.message?.role || 'assistant',
-          content: choice.message?.content || ''
+          role: 'assistant',
+          content: content
         },
-        finish_reason: choice.finish_reason || 'stop'
-      })),
-      usage: response.data.usage || {
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        total_tokens: 0
+        finish_reason: 'stop'
+      }],
+      usage: {
+        prompt_tokens: nvidiaResponse.data.usage?.prompt_tokens || 100,
+        completion_tokens: nvidiaResponse.data.usage?.completion_tokens || content.length,
+        total_tokens: nvidiaResponse.data.usage?.total_tokens || (100 + content.length)
       }
     };
 
-    console.log('Respuesta formateada - Content length:', formattedResponse.choices[0]?.message?.content?.length);
+    console.log('SENDING TO JANITOR - ID:', openaiResponse.id);
     
-    res.json(formattedResponse);
+    // Headers explícitos para JanitorAI
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).json(openaiResponse);
     
   } catch (error) {
-    console.error('Error completo:', error.message);
+    console.error('ERROR:', error.message);
     if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Data:', JSON.stringify(error.response.data));
+      console.error('ERROR RESPONSE:', error.response.status, error.response.data);
     }
     res.status(error.response?.status || 500).json({
       error: {
         message: error.response?.data?.error?.message || error.message,
-        type: 'nvidia_api_error',
-        details: error.response?.data
+        type: 'api_error'
       }
     });
   }
