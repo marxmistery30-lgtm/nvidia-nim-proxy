@@ -34,7 +34,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 
     const { 
       messages, 
-      model = 'deepseek-ai/deepseek-r1', 
+      model = 'deepseek-ai/deepseek-v3', 
       temperature = 0.7, 
       max_tokens = 2048,
       stream = false 
@@ -173,7 +173,7 @@ app.get('/v1/models', async (req, res) => {
     object: 'list',
     data: [
       { 
-        id: 'deepseek-ai/deepseek-r1', 
+        id: 'deepseek-ai/deepseek-v3', 
         object: 'model', 
         created: 1234567890,
         owned_by: 'deepseek-ai' 
@@ -192,3 +192,19 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+```
+
+**Pasos:**
+
+1. Ve a GitHub → tu repositorio → `index.js`
+2. Click en editar (lápiz)
+3. **Borra todo el contenido**
+4. **Copia y pega este código completo**
+5. Click en "Commit changes"
+6. Espera el redeploy en Vercel (1-2 minutos)
+
+**No necesitas cambiar nada en JanitorAI** - automáticamente usará DeepSeek V3.
+
+Si quieres verificar que está usando V3, mira los logs de Vercel después de enviar un mensaje, debería decir:
+```
+REQUEST - Model: deepseek-ai/deepseek-v3 Messages: X Stream: true
