@@ -20,9 +20,28 @@ app.use(express.json());
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 
-app.post('/v1/chat/completions', async (req, res) => {
+// Manejar múltiples rutas posibles
+app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, res) => {
   try {
+    if (!NVIDIA_API_KEY) {
+      return res.status(500).json({
+        error: {
+          message: 'NVIDIA_API_KEY no configurada en variables de entorno',
+          type: 'configuration_error'
+        }
+      });
+    }
+
     const { messages, model = 'nvidia/deepseek-r1', temperature = 0.7, max_tokens = 2048 } = req.body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({
+        error: {
+          message: 'Se requiere un array de messages',
+          type: 'invalid_request_error'
+        }
+      });
+    }
 
     const response = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
@@ -43,11 +62,12 @@ app.post('/v1/chat/completions', async (req, res) => {
 
     res.json(response.data);
   } catch (error) {
-    console.error('Error:', error.response?.data || error.message);
+    console.error('Error completo:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
       error: {
         message: error.response?.data?.error?.message || error.message,
-        type: 'nvidia_api_error'
+        type: 'nvidia_api_error',
+        details: error.response?.data
       }
     });
   }
@@ -62,7 +82,7 @@ app.get('/v1/models', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('NVIDIA NIM Proxy is running!');
+  res.send('NVIDIA NIM Proxy is running! ✅');
 });
 
 const PORT = process.env.PORT || 3000;
