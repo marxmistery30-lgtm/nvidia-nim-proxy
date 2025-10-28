@@ -51,6 +51,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 
     console.log('REQUEST - Model:', model, 'Messages:', messages.length, 'Stream:', stream);
 
+    // Si pide streaming, primero obtenemos la respuesta completa de NVIDIA
     const nvidiaResponse = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
       {
@@ -58,7 +59,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
         messages: messages,
         temperature: temperature,
         max_tokens: max_tokens,
-        stream: false
+        stream: false // NVIDIA siempre sin stream
       },
       {
         headers: {
@@ -70,46 +71,100 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
     );
 
     const content = nvidiaResponse.data.choices?.[0]?.message?.content || '';
-    console.log('NVIDIA RESPONSE - Length:', content.length, 'First 50 chars:', content.substring(0, 50));
+    console.log('NVIDIA RESPONSE - Length:', content.length);
 
-    // Formato OpenAI estricto
-    const openaiResponse = {
-      id: nvidiaResponse.data.id || `chatcmpl-${Date.now()}`,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: model,
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: content
-        },
-        finish_reason: 'stop'
-      }],
-      usage: {
-        prompt_tokens: nvidiaResponse.data.usage?.prompt_tokens || 100,
-        completion_tokens: nvidiaResponse.data.usage?.completion_tokens || content.length,
-        total_tokens: nvidiaResponse.data.usage?.total_tokens || (100 + content.length)
+    // Si JanitorAI pidió streaming, simulamos el stream
+    if (stream) {
+      console.log('ENVIANDO RESPUESTA EN MODO STREAMING');
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const chatId = `chatcmpl-${Date.now()}`;
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      // Dividir el contenido en chunks
+      const chunkSize = 50;
+      for (let i = 0; i < content.length; i += chunkSize) {
+        const chunk = content.substring(i, i + chunkSize);
+        const streamData = {
+          id: chatId,
+          object: 'chat.completion.chunk',
+          created: timestamp,
+          model: model,
+          choices: [{
+            index: 0,
+            delta: {
+              content: chunk
+            },
+            finish_reason: null
+          }]
+        };
+        
+        res.write(`data: ${JSON.stringify(streamData)}\n\n`);
       }
-    };
 
-    console.log('SENDING TO JANITOR - ID:', openaiResponse.id);
-    
-    // Headers explícitos para JanitorAI
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json(openaiResponse);
+      // Enviar mensaje final
+      const finalData = {
+        id: chatId,
+        object: 'chat.completion.chunk',
+        created: timestamp,
+        model: model,
+        choices: [{
+          index: 0,
+          delta: {},
+          finish_reason: 'stop'
+        }]
+      };
+      
+      res.write(`data: ${JSON.stringify(finalData)}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      
+      console.log('STREAMING COMPLETADO');
+      
+    } else {
+      // Respuesta normal sin streaming
+      console.log('ENVIANDO RESPUESTA NORMAL (SIN STREAMING)');
+      
+      const openaiResponse = {
+        id: nvidiaResponse.data.id || `chatcmpl-${Date.now()}`,
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: model,
+        choices: [{
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: content
+          },
+          finish_reason: 'stop'
+        }],
+        usage: {
+          prompt_tokens: nvidiaResponse.data.usage?.prompt_tokens || 100,
+          completion_tokens: nvidiaResponse.data.usage?.completion_tokens || content.length,
+          total_tokens: nvidiaResponse.data.usage?.total_tokens || (100 + content.length)
+        }
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.status(200).json(openaiResponse);
+    }
     
   } catch (error) {
     console.error('ERROR:', error.message);
     if (error.response) {
       console.error('ERROR RESPONSE:', error.response.status, error.response.data);
     }
-    res.status(error.response?.status || 500).json({
-      error: {
-        message: error.response?.data?.error?.message || error.message,
-        type: 'api_error'
-      }
-    });
+    
+    if (!res.headersSent) {
+      res.status(error.response?.status || 500).json({
+        error: {
+          message: error.response?.data?.error?.message || error.message,
+          type: 'api_error'
+        }
+      });
+    }
   }
 });
 
