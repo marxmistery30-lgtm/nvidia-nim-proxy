@@ -34,11 +34,16 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 
     const { 
       messages, 
-      model = 'deepseek-ai/deepseek-v3', 
-      temperature = 0.7, 
-      max_tokens = 2048,
-      stream = false 
+      model, 
+      temperature, 
+      max_tokens,
+      stream 
     } = req.body;
+
+    const finalModel = model || 'deepseek-ai/deepseek-v3';
+    const finalTemp = temperature || 0.7;
+    const finalMaxTokens = max_tokens || 2048;
+    const finalStream = stream || false;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({
@@ -49,17 +54,16 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
-    console.log('REQUEST - Model:', model, 'Messages:', messages.length, 'Stream:', stream);
+    console.log('REQUEST - Model:', finalModel, 'Messages:', messages.length, 'Stream:', finalStream);
 
-    // Si pide streaming, primero obtenemos la respuesta completa de NVIDIA
     const nvidiaResponse = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
       {
-        model: model,
+        model: finalModel,
         messages: messages,
-        temperature: temperature,
-        max_tokens: max_tokens,
-        stream: false // NVIDIA siempre sin stream
+        temperature: finalTemp,
+        max_tokens: finalMaxTokens,
+        stream: false
       },
       {
         headers: {
@@ -73,8 +77,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
     const content = nvidiaResponse.data.choices?.[0]?.message?.content || '';
     console.log('NVIDIA RESPONSE - Length:', content.length);
 
-    // Si JanitorAI pidió streaming, simulamos el stream
-    if (stream) {
+    if (finalStream) {
       console.log('ENVIANDO RESPUESTA EN MODO STREAMING');
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -83,7 +86,6 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       const chatId = `chatcmpl-${Date.now()}`;
       const timestamp = Math.floor(Date.now() / 1000);
 
-      // Dividir el contenido en chunks
       const chunkSize = 50;
       for (let i = 0; i < content.length; i += chunkSize) {
         const chunk = content.substring(i, i + chunkSize);
@@ -91,7 +93,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           id: chatId,
           object: 'chat.completion.chunk',
           created: timestamp,
-          model: model,
+          model: finalModel,
           choices: [{
             index: 0,
             delta: {
@@ -104,12 +106,11 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
         res.write(`data: ${JSON.stringify(streamData)}\n\n`);
       }
 
-      // Enviar mensaje final
       const finalData = {
         id: chatId,
         object: 'chat.completion.chunk',
         created: timestamp,
-        model: model,
+        model: finalModel,
         choices: [{
           index: 0,
           delta: {},
@@ -124,14 +125,13 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       console.log('STREAMING COMPLETADO');
       
     } else {
-      // Respuesta normal sin streaming
       console.log('ENVIANDO RESPUESTA NORMAL (SIN STREAMING)');
       
       const openaiResponse = {
         id: nvidiaResponse.data.id || `chatcmpl-${Date.now()}`,
         object: 'chat.completion',
         created: Math.floor(Date.now() / 1000),
-        model: model,
+        model: finalModel,
         choices: [{
           index: 0,
           message: {
@@ -154,7 +154,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
   } catch (error) {
     console.error('ERROR:', error.message);
     if (error.response) {
-      console.error('ERROR RESPONSE:', error.response.status, error.response.data);
+      console.error('ERROR RESPONSE:', error.response.status, JSON.stringify(error.response.data));
     }
     
     if (!res.headersSent) {
@@ -168,7 +168,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
   }
 });
 
-app.get('/v1/models', async (req, res) => {
+app.get('/v1/models', (req, res) => {
   res.json({
     object: 'list',
     data: [
@@ -192,19 +192,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-```
-
-**Pasos:**
-
-1. Ve a GitHub → tu repositorio → `index.js`
-2. Click en editar (lápiz)
-3. **Borra todo el contenido**
-4. **Copia y pega este código completo**
-5. Click en "Commit changes"
-6. Espera el redeploy en Vercel (1-2 minutos)
-
-**No necesitas cambiar nada en JanitorAI** - automáticamente usará DeepSeek V3.
-
-Si quieres verificar que está usando V3, mira los logs de Vercel después de enviar un mensaje, debería decir:
-```
-REQUEST - Model: deepseek-ai/deepseek-v3 Messages: X Stream: true
