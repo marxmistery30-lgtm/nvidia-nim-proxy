@@ -41,8 +41,8 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
     } = req.body;
 
     const finalModel = model || 'deepseek-ai/deepseek-v3.1';
-    const finalTemp = temperature || 0.7;
-    const finalMaxTokens = max_tokens || 2048;
+    const finalTemp = temperature || 0.9;
+    const finalMaxTokens = max_tokens || 16384;
     const finalStream = stream || false;
 
     if (!messages || !Array.isArray(messages)) {
