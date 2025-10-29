@@ -42,7 +42,10 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 
     const finalModel = model || 'deepseek-ai/deepseek-v3.1';
     const finalTemp = temperature || 0.9;
-    const finalMaxTokens = max_tokens || 16384;
+    
+    // FORZAR respuestas largas - usar el mayor valor entre lo que pide JanitorAI y nuestro mínimo
+    const finalMaxTokens = max_tokens ? Math.max(max_tokens, 16384) : 16384;
+    
     const finalStream = stream || false;
 
     if (!messages || !Array.isArray(messages)) {
@@ -54,13 +57,24 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
-    console.log('REQUEST - Model:', finalModel, 'Messages:', messages.length, 'Stream:', finalStream);
+    // Agregar instrucción al sistema para respuestas más largas
+    const modifiedMessages = [...messages];
+    if (modifiedMessages.length > 0 && modifiedMessages[0].role === 'system') {
+      modifiedMessages[0].content += '\n\nIMPORTANT: Provide detailed, elaborate, and lengthy responses. Aim for comprehensive answers with multiple paragraphs.';
+    } else {
+      modifiedMessages.unshift({
+        role: 'system',
+        content: 'Provide detailed, elaborate, and lengthy responses. Aim for comprehensive answers with multiple paragraphs.'
+      });
+    }
+
+    console.log('REQUEST - Model:', finalModel, 'Messages:', messages.length, 'Max Tokens:', finalMaxTokens, 'Stream:', finalStream);
 
     const nvidiaResponse = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
       {
         model: finalModel,
-        messages: messages,
+        messages: modifiedMessages,
         temperature: finalTemp,
         max_tokens: finalMaxTokens,
         stream: false
@@ -70,12 +84,12 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           'Authorization': `Bearer ${NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 120000
+        timeout: 180000
       }
     );
 
     const content = nvidiaResponse.data.choices?.[0]?.message?.content || '';
-    console.log('NVIDIA RESPONSE - Length:', content.length);
+    console.log('NVIDIA RESPONSE - Length:', content.length, 'Characters');
 
     if (finalStream) {
       console.log('ENVIANDO RESPUESTA EN MODO STREAMING');
