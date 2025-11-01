@@ -15,7 +15,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
@@ -84,7 +84,9 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           'Authorization': `Bearer ${NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 180000
+        timeout: 180000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       }
     );
 
