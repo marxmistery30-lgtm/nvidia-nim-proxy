@@ -40,7 +40,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       stream 
     } = req.body;
 
-    const finalModel = model || 'zhipu-ai/glm-4-7';
+    const finalModel = model || 'deepseek-ai/deepseek-v3.1-terminus';
     const finalTemp = temperature || 0.9;
     
     // FORZAR respuestas largas - usar el mayor valor entre lo que pide JanitorAI y nuestro mínimo
@@ -189,7 +189,7 @@ app.get('/v1/models', (req, res) => {
     object: 'list',
     data: [
       { 
-        id: 'zhipu-ai/glm-4-7', 
+        id: 'deepseek-ai/deepseek-v3.1-terminus', 
         object: 'model', 
         created: 1234567890,
         owned_by: 'deepseek-ai' 
