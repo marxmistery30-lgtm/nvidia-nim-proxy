@@ -40,12 +40,9 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       stream 
     } = req.body;
 
-    const finalModel = model || 'deepseek-ai/deepseek-v4-flash-0731';
+    const finalModel = model || 'deepseek-ai/deepseek-v3.1';
     const finalTemp = temperature || 0.9;
-    
-    // FORZAR respuestas largas - usar el mayor valor entre lo que pide JanitorAI y nuestro mínimo
-    const finalMaxTokens = max_tokens ? Math.max(max_tokens, 16384) : 16384;
-    
+    const finalMaxTokens = max_tokens ? Math.max(max_tokens, 8192) : 8192; // Reducido de 16384
     const finalStream = stream || false;
 
     if (!messages || !Array.isArray(messages)) {
@@ -57,18 +54,31 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       });
     }
 
-    // Agregar instrucción al sistema para respuestas más largas
-    const modifiedMessages = [...messages];
+    console.log('REQUEST - Model:', finalModel, 'Total Messages:', messages.length, 'Max Tokens:', finalMaxTokens, 'Stream:', finalStream);
+
+    // LIMITAR historial para evitar timeouts
+    let modifiedMessages = [...messages];
+    
+    // Si hay demasiados mensajes, mantener solo los más recientes
+    const MAX_MESSAGES = 15; // Limitar a últimos 15 mensajes
+    if (modifiedMessages.length > MAX_MESSAGES) {
+      const systemMsg = modifiedMessages.find(m => m.role === 'system');
+      const recentMessages = modifiedMessages.slice(-(MAX_MESSAGES - 1));
+      modifiedMessages = systemMsg ? [systemMsg, ...recentMessages] : recentMessages;
+      console.log('⚠️ Historial reducido de', messages.length, 'a', modifiedMessages.length, 'mensajes');
+    }
+
+    // Agregar instrucción al sistema para respuestas detalladas
     if (modifiedMessages.length > 0 && modifiedMessages[0].role === 'system') {
-      modifiedMessages[0].content += '\n\nIMPORTANT: Provide detailed, elaborate, and lengthy responses. Aim for comprehensive answers with multiple paragraphs.';
+      modifiedMessages[0].content += '\n\nProvide detailed and engaging responses.';
     } else {
       modifiedMessages.unshift({
         role: 'system',
-        content: 'Provide detailed, elaborate, and lengthy responses. Aim for comprehensive answers with multiple paragraphs.'
+        content: 'Provide detailed and engaging responses.'
       });
     }
 
-    console.log('REQUEST - Model:', finalModel, 'Messages:', messages.length, 'Max Tokens:', finalMaxTokens, 'Stream:', finalStream);
+    console.log('Enviando', modifiedMessages.length, 'mensajes a NVIDIA...');
 
     const nvidiaResponse = await axios.post(
       `${NVIDIA_BASE_URL}/chat/completions`,
@@ -84,17 +94,17 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           'Authorization': `Bearer ${NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 180000,
+        timeout: 120000, // Reducido a 2 minutos
         maxContentLength: Infinity,
         maxBodyLength: Infinity
       }
     );
 
     const content = nvidiaResponse.data.choices?.[0]?.message?.content || '';
-    console.log('NVIDIA RESPONSE - Length:', content.length, 'Characters');
+    console.log('✅ NVIDIA RESPONSE - Length:', content.length, 'caracteres');
 
     if (finalStream) {
-      console.log('ENVIANDO RESPUESTA EN MODO STREAMING');
+      console.log('📤 ENVIANDO RESPUESTA EN MODO STREAMING');
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -138,10 +148,10 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       res.write('data: [DONE]\n\n');
       res.end();
       
-      console.log('STREAMING COMPLETADO');
+      console.log('✅ STREAMING COMPLETADO');
       
     } else {
-      console.log('ENVIANDO RESPUESTA NORMAL (SIN STREAMING)');
+      console.log('📤 ENVIANDO RESPUESTA NORMAL (SIN STREAMING)');
       
       const openaiResponse = {
         id: nvidiaResponse.data.id || `chatcmpl-${Date.now()}`,
@@ -168,7 +178,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
     }
     
   } catch (error) {
-    console.error('ERROR:', error.message);
+    console.error('❌ ERROR:', error.message);
     if (error.response) {
       console.error('ERROR RESPONSE:', error.response.status, JSON.stringify(error.response.data));
     }
@@ -189,7 +199,7 @@ app.get('/v1/models', (req, res) => {
     object: 'list',
     data: [
       { 
-        id: 'deepseek-ai/deepseek-v4-flash-0731', 
+        id: 'deepseek-ai/deepseek-v3.1', 
         object: 'model', 
         created: 1234567890,
         owned_by: 'deepseek-ai' 
@@ -208,4 +218,3 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
-   // Update 2025
