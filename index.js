@@ -42,7 +42,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
 
     const finalModel = model || 'deepseek-ai/deepseek-v4-pro-0813';
     const finalTemp = temperature || 0.9;
-    const finalMaxTokens = max_tokens ? Math.max(max_tokens, 8192) : 8192; // Reducido de 16384
+    const finalMaxTokens = max_tokens ? Math.max(max_tokens, 8192) : 8192;
     const finalStream = stream || false;
 
     if (!messages || !Array.isArray(messages)) {
@@ -60,7 +60,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
     let modifiedMessages = [...messages];
     
     // Si hay demasiados mensajes, mantener solo los más recientes
-    const MAX_MESSAGES = 15; // Limitar a últimos 15 mensajes
+    const MAX_MESSAGES = 15;
     if (modifiedMessages.length > MAX_MESSAGES) {
       const systemMsg = modifiedMessages.find(m => m.role === 'system');
       const recentMessages = modifiedMessages.slice(-(MAX_MESSAGES - 1));
@@ -94,7 +94,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           'Authorization': `Bearer ${NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 120000, // Reducido a 2 minutos
+        timeout: 300000, // AUMENTADO a 5 minutos
         maxContentLength: Infinity,
         maxBodyLength: Infinity
       }
