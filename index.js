@@ -40,7 +40,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       stream 
     } = req.body;
 
-    const finalModel = model || 'deepseek-ai/deepseek-v4-pro-0813';
+    const finalModel = model || 'mistralai/mistral-nemotron';
     const finalTemp = temperature || 0.9;
     const finalMaxTokens = max_tokens ? Math.max(max_tokens, 8192) : 8192;
     const finalStream = stream || false;
@@ -199,7 +199,7 @@ app.get('/v1/models', (req, res) => {
     object: 'list',
     data: [
       { 
-        id: 'deepseek-ai/deepseek-v4-pro-0813', 
+        id: 'mistralai/mistral-nemotron', 
         object: 'model', 
         created: 1234567890,
         owned_by: 'deepseek-ai' 
