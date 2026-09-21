@@ -40,7 +40,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
       stream 
     } = req.body;
 
-    const finalModel = model || 'mistralai/mistral-nemotron';
+    const finalModel = model || 'z-ai/glm-5.3';
     const finalTemp = temperature || 0.9;
     const finalMaxTokens = max_tokens ? Math.max(max_tokens, 8192) : 8192;
     const finalStream = stream || false;
@@ -199,7 +199,7 @@ app.get('/v1/models', (req, res) => {
     object: 'list',
     data: [
       { 
-        id: 'mistralai/mistral-nemotron', 
+        id: 'z-ai/glm-5.3', 
         object: 'model', 
         created: 1234567890,
         owned_by: 'deepseek-ai' 
