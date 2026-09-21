@@ -94,7 +94,7 @@ app.post(['/v1/chat/completions', '/chat/completions', '/v1', '/'], async (req, 
           'Authorization': `Bearer ${NVIDIA_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 120000, // AUMENTADO a 5 minutos
+        timeout: 180000, // AUMENTADO a 5 minutos
         maxContentLength: Infinity,
         maxBodyLength: Infinity
       }
